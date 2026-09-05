@@ -3,16 +3,12 @@ import { readFileSync, existsSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// スクリプト自身のディレクトリとプロジェクトルート
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = resolve(__dirname, '..');
 
-// .env ファイルのパースと環境変数のロード
 function loadEnv(): void {
   const envPath = resolve(PROJECT_ROOT, '.env');
-  if (!existsSync(envPath)) {
-    return;
-  }
+  if (!existsSync(envPath)) return;
 
   const content = readFileSync(envPath, 'utf-8');
   for (const line of content.split('\n')) {
@@ -24,7 +20,6 @@ function loadEnv(): void {
     const key = trimmed.slice(0, eqIdx).trim();
     let val = trimmed.slice(eqIdx + 1).trim();
 
-    // クォートの除去
     if (
       (val.startsWith('"') && val.endsWith('"')) ||
       (val.startsWith("'") && val.endsWith("'"))
@@ -38,7 +33,15 @@ function loadEnv(): void {
   }
 }
 
-// Slack の新しい markdown ブロック (上限 12,000 文字、安全マージン 10,000 文字) に応じた分割
+// 見出し内のリンク構文（### 1. [タイトル](URL)）を Slack で確実にリンク化されるよう正規化
+function normalizeMarkdownForSlack(text: string): string {
+  // ### 1. [タイトル](URL) を ### 1. タイトル\n🔗 参照元: [記事リンク](URL) に変換
+  return text.replace(
+    /^(#{1,4}\s*(?:[0-9]+\.)?)\s*\[([^\]]+)\]\((https?:\/\/[^\s\)]+)\)/gm,
+    '$1 $2\n🔗 参照元: [$2]($3)'
+  );
+}
+
 function splitTextIntoMarkdownBlocks(text: string, maxLen = 10000): string[] {
   if (text.length <= maxLen) {
     return [text];
@@ -82,9 +85,8 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  // 送信対象ファイルの取得（引数または標準入力）
   const filePathArg = process.argv[2];
-  let markdownText = '';
+  let rawText = '';
 
   if (filePathArg) {
     const targetFile = resolve(process.cwd(), filePathArg);
@@ -92,20 +94,21 @@ async function main(): Promise<void> {
       console.error(`[ERROR] 指定されたファイルが存在しません: ${targetFile}`);
       process.exit(1);
     }
-    markdownText = readFileSync(targetFile, 'utf-8');
+    rawText = readFileSync(targetFile, 'utf-8');
   } else {
-    markdownText = readFileSync(0, 'utf-8');
+    rawText = readFileSync(0, 'utf-8');
   }
 
-  if (!markdownText.trim()) {
+  if (!rawText.trim()) {
     console.warn('[WARN] 送信するメッセージ本文が空です。送信をスキップします。');
     process.exit(0);
   }
 
-  console.log(`[INFO] Slack チャンネル (${channel}) へ最新の type: "markdown" ブロックで送信中...`);
+  // Slack 向けにリンクを安全に正規化
+  const markdownText = normalizeMarkdownForSlack(rawText);
 
-  // 最新の Slack Block Kit: type: "markdown" ブロックを生成
-  // (AI/LLM 出力の標準 Markdown、見出し #、太字 **、テーブル等をネイティブレンダリング)
+  console.log(`[INFO] Slack チャンネル (${channel}) へ送信中...`);
+
   const textChunks = splitTextIntoMarkdownBlocks(markdownText);
   const blocks = textChunks.map((chunk) => ({
     type: 'markdown',
@@ -135,7 +138,7 @@ async function main(): Promise<void> {
       process.exit(1);
     }
 
-    console.log('[SUCCESS] type: "markdown" での Slack メッセージ送信が完了しました！');
+    console.log('[SUCCESS] Slack へのメッセージ送信が完了しました！');
   } catch (error) {
     console.error('[ERROR] Slack 送信中にネットワークエラーが発生しました:', error);
     process.exit(1);
