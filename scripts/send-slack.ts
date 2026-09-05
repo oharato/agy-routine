@@ -38,8 +38,12 @@ function loadEnv(): void {
   }
 }
 
-// テキストを Slack の Block Kit 上限（3000文字）に配慮して分割する
-function splitTextIntoBlocks(text: string, maxLen = 2900): string[] {
+// Slack の新しい markdown ブロック (上限 12,000 文字、安全マージン 10,000 文字) に応じた分割
+function splitTextIntoMarkdownBlocks(text: string, maxLen = 10000): string[] {
+  if (text.length <= maxLen) {
+    return [text];
+  }
+
   const chunks: string[] = [];
   const lines = text.split('\n');
   let currentChunk = '';
@@ -78,7 +82,7 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  // 送信対象ファイルの取得（引数またはデフォルトレポートパス）
+  // 送信対象ファイルの取得（引数または標準入力）
   const filePathArg = process.argv[2];
   let markdownText = '';
 
@@ -90,7 +94,6 @@ async function main(): Promise<void> {
     }
     markdownText = readFileSync(targetFile, 'utf-8');
   } else {
-    // 引数がない場合は標準入力から読む
     markdownText = readFileSync(0, 'utf-8');
   }
 
@@ -99,23 +102,19 @@ async function main(): Promise<void> {
     process.exit(0);
   }
 
-  console.log(`[INFO] Slack チャンネル (${channel}) へレポートを送信中...`);
+  console.log(`[INFO] Slack チャンネル (${channel}) へ最新の type: "markdown" ブロックで送信中...`);
 
-  // Block Kit の section ブロック配列を生成 (type: "mrkdwn")
-  const textChunks = splitTextIntoBlocks(markdownText);
+  // 最新の Slack Block Kit: type: "markdown" ブロックを生成
+  // (AI/LLM 出力の標準 Markdown、見出し #、太字 **、テーブル等をネイティブレンダリング)
+  const textChunks = splitTextIntoMarkdownBlocks(markdownText);
   const blocks = textChunks.map((chunk) => ({
-    type: 'section',
-    text: {
-      type: 'mrkdwn',
-      text: chunk,
-    },
+    type: 'markdown',
+    text: chunk,
   }));
 
-  // Slack API chat.postMessage ペイロード
   const payload = {
     channel,
     text: '🚀 Web開発・AI自動化トレンド要約レポートが届きました',
-    mrkdwn: true,
     blocks,
   };
 
@@ -136,7 +135,7 @@ async function main(): Promise<void> {
       process.exit(1);
     }
 
-    console.log('[SUCCESS] Slack へのメッセージ送信が完了しました！');
+    console.log('[SUCCESS] type: "markdown" での Slack メッセージ送信が完了しました！');
   } catch (error) {
     console.error('[ERROR] Slack 送信中にネットワークエラーが発生しました:', error);
     process.exit(1);
