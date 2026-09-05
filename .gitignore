@@ -1,0 +1,12 @@
+# 環境変数・認証情報
+.env
+.env.local
+
+# ログファイル
+logs/*
+!logs/.gitkeep
+
+# 一時ファイル
+*.tmp
+*.log
+.DS_Store

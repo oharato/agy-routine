@@ -1,0 +1,15 @@
+[Unit]
+Description=Antigravity CLI Routine Task: %I
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/workspace/agy-routine
+ExecStart=%h/workspace/agy-routine/scripts/run-task.sh %I
+StandardOutput=journal
+StandardError=journal
+TimeoutStartSec=1200
+
+[Install]
+WantedBy=default.target
