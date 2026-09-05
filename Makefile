@@ -2,7 +2,7 @@
 SHELL := /usr/bin/env bash
 .DEFAULT_GOAL := help
 
-.PHONY: help new list install run status log journal stop start
+.PHONY: help new list install run status log journal stop start test-slack typecheck
 
 help: ## 利用可能なコマンド一覧を表示します
 	@echo "=========================================================================="
@@ -13,11 +13,12 @@ help: ## 利用可能なコマンド一覧を表示します
 	@echo "■ 使用例:"
 	@echo "  make new TASK=my-check        # 新規タスク 'my-check' をテンプレートから作成"
 	@echo "  make list                     # 登録タスク一覧とスケジュールを表示"
-	@echo "  make run TASK=daily-git-digest# 指定タスクを手動テスト実行"
+	@echo "  make run TASK=tech-news       # 指定タスクを手動テスト実行 (Slack送信含む)"
+	@echo "  make test-slack               # Slack 送信設定 (.env) の疎通テスト"
 	@echo "  make install                  # 全タスクのタイマーを一括生成・有効化"
 	@echo "  make status                   # systemd タイマーの稼働状況を確認"
-	@echo "  make log TASK=daily-git-digest# 今日の実行ログファイルを表示"
-	@echo "  make journal TASK=daily-git-digest # systemd のリアルタイムログを追跡"
+	@echo "  make log TASK=tech-news       # 今日の実行ログファイルを表示"
+	@echo "  make journal TASK=tech-news   # systemd のリアルタイムログを追跡"
 	@echo "=========================================================================="
 
 new: ## 新規タスクを作成します (例: make new TASK=my-task)
@@ -45,9 +46,9 @@ list: ## 定義済みタスクと稼働タイマーの一覧を表示します
 install: ## tasks/ 配下の全タスクのタイマーを一括生成・有効化します
 	@./scripts/install-tasks.sh
 
-run: ## 指定タスクを手動テスト実行します (例: make run TASK=daily-git-digest)
+run: ## 指定タスクを手動テスト実行します (例: make run TASK=tech-news)
 	@if [ -z "$(TASK)" ]; then \
-		echo -e "[\033[31mERROR\033[0m] TASK 名を指定してください。 (例: make run TASK=daily-git-digest)"; \
+		echo -e "[\033[31mERROR\033[0m] TASK 名を指定してください。 (例: make run TASK=tech-news)"; \
 		exit 1; \
 	fi
 	@./scripts/run-task.sh $(TASK)
@@ -55,9 +56,9 @@ run: ## 指定タスクを手動テスト実行します (例: make run TASK=dai
 status: ## systemd タイマーのアクティブ状況を確認します
 	@systemctl --user list-timers 'agy-task-*'
 
-log: ## 指定タスクの本日ログファイルを表示します (例: make log TASK=daily-git-digest)
+log: ## 指定タスクの本日ログファイルを表示します (例: make log TASK=tech-news)
 	@if [ -z "$(TASK)" ]; then \
-		echo -e "[\033[31mERROR\033[0m] TASK 名を指定してください。 (例: make log TASK=daily-git-digest)"; \
+		echo -e "[\033[31mERROR\033[0m] TASK 名を指定してください。 (例: make log TASK=tech-news)"; \
 		exit 1; \
 	fi
 	@LOG_FILE="logs/$(TASK)/routine-$$(date +'%Y%m%d').log"; \
@@ -67,14 +68,14 @@ log: ## 指定タスクの本日ログファイルを表示します (例: make 
 		echo -e "[\033[33mWARN\033[0m] 本日のログファイルが見つかりません: $$LOG_FILE"; \
 	fi
 
-journal: ## 指定タスクの systemd リアルタイムログを追跡します (例: make journal TASK=daily-git-digest)
+journal: ## 指定タスクの systemd リアルタイムログを追跡します (例: make journal TASK=tech-news)
 	@if [ -z "$(TASK)" ]; then \
-		echo -e "[\033[31mERROR\033[0m] TASK 名を指定してください。 (例: make journal TASK=daily-git-digest)"; \
+		echo -e "[\033[31mERROR\033[0m] TASK 名を指定してください。 (例: make journal TASK=tech-news)"; \
 		exit 1; \
 	fi
 	@journalctl --user -u agy-task@$(TASK).service -f
 
-stop: ## 指定タスクのタイマーを一時停止します (例: make stop TASK=daily-git-digest)
+stop: ## 指定タスクのタイマーを一時停止します (例: make stop TASK=tech-news)
 	@if [ -z "$(TASK)" ]; then \
 		echo -e "[\033[31mERROR\033[0m] TASK 名を指定してください。"; \
 		exit 1; \
@@ -82,10 +83,17 @@ stop: ## 指定タスクのタイマーを一時停止します (例: make stop 
 	@systemctl --user stop agy-task-$(TASK).timer
 	@echo -e "[\033[32mOK\033[0m] agy-task-$(TASK).timer を停止しました。"
 
-start: ## 指定タスクのタイマーを再開します (例: make start TASK=daily-git-digest)
+start: ## 指定タスクのタイマーを再開します (例: make start TASK=tech-news)
 	@if [ -z "$(TASK)" ]; then \
 		echo -e "[\033[31mERROR\033[0m] TASK 名を指定してください。"; \
 		exit 1; \
 	fi
 	@systemctl --user start agy-task-$(TASK).timer
 	@echo -e "[\033[32mOK\033[0m] agy-task-$(TASK).timer を再開しました。"
+
+test-slack: ## Slack 送信 (.env) の疎通テストを実行します
+	@echo "Slack 疎通テスト中..."
+	@echo -e "🚀 *[agy-routine]* Slack 疎通テストメッセージです。\n正常に受信できています！" | node --experimental-strip-types scripts/send-slack.ts
+
+typecheck: ## TypeScript の型チェックを実行します
+	@pnpm typecheck
