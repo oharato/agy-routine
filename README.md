@@ -35,12 +35,16 @@ agy-routine/
 │   │   ├── prompt.md           # エージェントへの指示書 (Markdown)
 │   │   ├── task.conf           # スケジュール・設定定義
 │   │   └── README.md           # タスク仕様
-│   ├── daily-git-digest/       # 実装例1: 平日朝9時の Git 変更点・PRサマリ
+│   ├── tech-news/              # 実装タスク: 毎朝9時 AI開発自動化トレンド収集 & Slack配信
 │   │   ├── prompt.md
-│   │   └── task.conf
-│   └── weekly-dependency-check/# 実装例2: 毎週金曜夕方の依存パッケージ監査
+│   │   ├── task.conf
+│   │   ├── post-run.sh
+│   │   └── reports/
+│   └── seagaia-fukko-wari/     # 実装タスク: 毎日10時 シーガイア「九州ふっこう応援割」チェック & Slack配信
 │       ├── prompt.md
-│       └── task.conf
+│       ├── task.conf
+│       ├── post-run.sh
+│       └── reports/
 ├── systemd/                    # systemd ユニット定義
 │   └── agy-task@.service       # 共通テンプレートサービス (agy-task@<タスク名>.service)
 ├── scripts/                    # 実行・管理スクリプト
